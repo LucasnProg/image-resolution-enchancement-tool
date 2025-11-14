@@ -4,21 +4,50 @@ from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 import io
 import torch
-from realesrgan import RealESRGAN
 import numpy as np
 import cv2
 
-MODEL_PATH = 'backend\models\RealESRGAN_x4plus.pth'
+from realesrgan import RealESRGANer
+from basicsr.archs.rrdbnet_arch import RRDBNet
+
+MODEL_PATH = r"models\RealESRGAN_x4plus.pth"
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# ---------------------------
+# Carregar modelo RealESRGAN
+# ---------------------------
 try:
-    model = RealESRGAN(scale=4, model_path=MODEL_PATH).to(DEVICE)
-    model.load_weights(MODEL_PATH)
+    # Define arquitetura do modelo ESRGAN x4
+    rrdb_model = RRDBNet(
+        num_in_ch=3,
+        num_out_ch=3,
+        num_feat=64,
+        num_block=23,
+        num_grow_ch=32,
+        scale=4
+    )
+
+    # Carrega o RealESRGANer
+    model = RealESRGANer(
+        scale=4,
+        model_path=MODEL_PATH,
+        model=rrdb_model,
+        tile=0,
+        tile_pad=10,
+        pre_pad=0,
+        half=False 
+    )
+
     print(f"Modelo carregado com sucesso no {DEVICE}")
+
 except Exception as exc:
-    print("Não foi possivel carregar o modelo")
+    print("Não foi possível carregar o modelo:", exc)
+    model = None
 
 
+# ---------------------------
+# FastAPI
+# ---------------------------
 app = FastAPI()
 
 origins = [
@@ -27,13 +56,17 @@ origins = [
 ]
 
 app.add_middleware(
-   CORSMiddleware,
-   allow_origins = origins,
-   allow_credentials = True,
-   allow_methods= ["*"],
-   allow_headers= ["*"] 
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
- 
+
+
+# ---------------------------
+# Rota de upscale
+# ---------------------------
 @app.post("/upscale/")
 async def upscale_image(file: UploadFile = File(...)):
     try:
@@ -41,27 +74,32 @@ async def upscale_image(file: UploadFile = File(...)):
         image = Image.open(io.BytesIO(contents)).convert("RGB")
 
         if model:
+            # Converter para BGR (OpenCV)
             img_np = np.array(image)
-            img_np_rgb = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+            img_bgr = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
 
-            upscaled_image_np = model.predict(img_np_rgb)
-            upscaled_image = Image.fromarray(cv2.cvtColor(upscaled_image_np, cv2.COLOR_BGR2RGB)) 
+            # Rodar modelo RealESRGAN
+            output, _ = model.enhance(img_bgr, outscale=4)
+
+            # Voltar para RGB
+            upscaled_image = Image.fromarray(cv2.cvtColor(output, cv2.COLOR_BGR2RGB))
+
         else:
             width, height = image.size
             upscaled_image = image.resize((width * 2, height * 2), Image.LANCZOS)
-            print("Usando mock de upscale, pois o modelo real não foi carregado.")
+            print("Usando upscale fake. Modelo não carregado.")
 
+        # Converter para bytes
         img_byte_arr = io.BytesIO()
-        output_format_save = file.filename.split(".")[-1].upper() if "." in file.filename else "PNG"
+        ext = file.filename.split(".")[-1].upper()
 
-        if output_format_save not in ["JPEG", "PNG", "WEBP", "BMP"]:
-            output_format_save = "PNG"
+        if ext not in ["JPEG", "PNG", "WEBP", "BMP"]:
+            ext = "PNG"
 
-        upscaled_image.save(img_byte_arr, format=output_format_save)
+        upscaled_image.save(img_byte_arr, format=ext)
         img_byte_arr.seek(0)
 
-        media_type = file.content_type if file.content_type in ["image/jpeg", "image/png"] else "image/png"
-
         return StreamingResponse(img_byte_arr, media_type=file.content_type)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

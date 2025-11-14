@@ -1,83 +1,105 @@
-import { useCallback, useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import { ReactCompareImage } from 'react-compare-image';
-import './App.css'
-import { upScaleImage } from './services/api';
-
+import { useCallback, useState } from "react";
+import { useDropzone } from "react-dropzone";
+import ReactCompareImage from "react-compare-image";
+import { upScaleImage } from "./services/api";
 
 function App() {
   const [originalImage, setOriginalImage] = useState(null);
-  const [upscaleImage, setUpscaleImage] = useState(null);
-  const [loading, setLoading] = useState(null);
+  const [upscaledImage, setUpscaledImage] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const onDropImage = useCallback(
-    async (accepteFiles) => {
-      const file = accepteFiles[0];
-      if(!file) return;
+  const onDropImage = useCallback(async (acceptedFiles) => {
+    const file = acceptedFiles[0];
+    if (!file) return;
 
-      setOriginalImage(URL.createObjectURL(file));
-      setOriginalImage(null);
-      setError(null);
-      setLoading(true);
+    setOriginalImage(URL.createObjectURL(file));
+    setUpscaledImage(null);
+    setError(null);
+    setLoading(true);
 
-      const formData = new formData();
-      formData.append('file', file);
+    const formData = new FormData();
+    formData.append("file", file);
 
-      try{
-        const response = upScaleImage(formData);
+    try {
+      const response = await upScaleImage(formData);
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Erro ao fazer o upload do arquivo');
-        }
-
-        const blob = response.blob();
-
-        setUpscaleImage(URL.createObjectURL(blob));
-      } catch (error) {
-        console.log('erro no upload da imagem: ',error);
-        setError(error.mensage || 'falha ao processar imagem');
-      } finally{
-        setLoading(false);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Erro ao processar imagem");
       }
+
+      const blob = await response.blob();
+      setUpscaledImage(URL.createObjectURL(blob));
+    } catch (error) {
+      console.error("Erro no upload da imagem:", error);
+      setError(error.message || "Falha ao processar imagem");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropZone({ onDrop, accept: { 'image/*': ['.jpeg', '.png', '.jpg'] } });
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: onDropImage,
+    accept: { "image/*": [".jpeg", ".png", ".jpg"] },
+  });
 
   return (
-    <div className="App">
-            <h1>Melhore a resolução da sua imagem</h1>
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center px-4 py-10">
+      <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+        Melhore a resolução da sua imagem
+      </h1>
 
-            <div {...getRootProps()} className={`dropzone ${isDragActive ? 'active' : ''}`}>
-                <input {...getInputProps()} />
-                {
-                    isDragActive ?
-                    <p>Solte a imagem aqui...</p> :
-                    <p>Arraste e solte uma imagem aqui, ou clique para selecionar</p>
-                }
-            </div>
+      <div
+        {...getRootProps()}
+        className={`w-full max-w-xl p-8 border-2 border-dashed rounded-2xl cursor-pointer transition 
+          ${isDragActive
+            ? "border-blue-500 bg-blue-50"
+            : "border-gray-400 bg-white"
+          }
+        `}
+      >
+        <input {...getInputProps()} />
+        <p className="text-center text-gray-600">
+          {isDragActive
+            ? "Solte a imagem aqui..."
+            : "Arraste e solte uma imagem ou clique para selecionar"}
+        </p>
+      </div>
 
-            {loading && <p>Processando imagem...</p>}
-            {error && <p className="error">{error}</p>}
+      {loading && (
+        <p className="mt-4 text-blue-600 font-semibold">Processando imagem...</p>
+      )}
 
-            {(originalImage && upscaledImage) && (
-                <div className="image-comparison-container">
-                    <h2>Resultado</h2>
-                    <ReactCompareImage
-                        itemOne={<img src={originalImage} alt="Original" />}
-                        itemTwo={<img src={upscaledImage} alt="Upscaled" />}
-                        keyboardIncrement="1%"
-                        position={50}
-                        className="comparison-slider"
-                    />
-                    <button onClick={handleDownload} className="download-button">Baixar Imagem Melhorada</button>
-                </div>
-            )}
-             {!originalImage && <p>Faça o upload de uma imagem para começar!</p>}
+      {error && (
+        <p className="mt-4 text-red-600 font-semibold">{error}</p>
+      )}
+
+      {originalImage && upscaledImage && (
+        <div className="mt-10 w-full max-w-3xl bg-white p-6 rounded-xl shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Comparação</h2>
+
+          <ReactCompareImage
+            leftImage={originalImage}
+            rightImage={upscaledImage}
+            className="rounded-lg"
+          />
+
+          <a
+            href={upscaledImage}
+            download="imagem-upscale.png"
+            className="mt-6 inline-block bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-blue-700 transition"
+          >
+            Baixar Imagem Melhorada
+          </a>
         </div>
-  )
+      )}
+
+      {!originalImage && (
+        <p className="mt-6 text-gray-500">Faça o upload de uma imagem para começar!</p>
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
