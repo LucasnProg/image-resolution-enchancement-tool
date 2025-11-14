@@ -19,9 +19,9 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 try:
     # Define arquitetura do modelo ESRGAN x4
     rrdb_model = RRDBNet(
-        num_in_ch=3,
-        num_out_ch=3,
-        num_feat=64,
+        num_in_ch=3, 
+        num_out_ch=3, 
+        num_feat=64, 
         num_block=23,
         num_grow_ch=32,
         scale=4
@@ -32,8 +32,8 @@ try:
         scale=4,
         model_path=MODEL_PATH,
         model=rrdb_model,
-        tile=0,
-        tile_pad=10,
+        tile=1000, 
+        tile_pad=20,
         pre_pad=0,
         half=False 
     )
