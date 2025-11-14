@@ -24,13 +24,9 @@ function App() {
     try {
       const response = await upScaleImage(formData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Erro ao processar imagem");
-      }
-
-      const blob = await response.blob();
+      const blob = response.data;
       setUpscaledImage(URL.createObjectURL(blob));
+
     } catch (error) {
       console.error("Erro no upload da imagem:", error);
       setError(error.message || "Falha ao processar imagem");

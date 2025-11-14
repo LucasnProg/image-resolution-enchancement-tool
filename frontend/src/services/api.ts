@@ -5,7 +5,10 @@ const api = axios.create({
 });
 
 export const upScaleImage = (formData: FormData) => {
-    return api.post('/upscale/',formData, {
-        responseType: 'blob'
-    });
+  return api.post('/upscale/', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+    responseType: 'blob'
+  });
 }
