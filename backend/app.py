@@ -6,11 +6,12 @@ import io
 import torch
 import numpy as np
 import cv2
+import os
 
 from realesrgan import RealESRGANer
 from basicsr.archs.rrdbnet_arch import RRDBNet
 
-MODEL_PATH = "models\RealESRGAN_x4plus.pth"
+MODEL_PATH = os.path.join("models", "RealESRGAN_x4plus.pth")
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # ---------------------------
